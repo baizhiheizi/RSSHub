@@ -156,10 +156,10 @@ async function handler(ctx) {
     const orders = orderHistoryResponse.data?.list ?? [];
     const leadDetailsUrl = `${BASE_URL}/zh-CN/copy-trading/lead-details/${portfolioId}`;
 
-    const item = orders.slice(0, pageSize).map((order, index) => ({
+    const item = orders.slice(0, pageSize).map((order) => ({
         title: buildOrderTitle(order),
-        link: `${leadDetailsUrl}#${order.orderTime}-${index}`,
-        guid: `${portfolioId}-${order.orderTime}-${index}`,
+        link: `${leadDetailsUrl}#${order.orderTime}`,
+        guid: `${portfolioId}-${order.orderTime}-${order.symbol}-${order.side}-${order.positionSide}-${order.executedQty}`,
         pubDate: parseDate(order.orderTime),
         category: [getActionLabel(order)],
         description: buildOrderDescription(order),
