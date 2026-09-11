@@ -1,0 +1,60 @@
+name: Sync with upstream
+
+on:
+  schedule:
+    # Weekly, Monday 04:23 UTC
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Fetch upstream and origin
+        run: |
+          git remote add upstream https://github.com/DIYgod/RSSHub.git
+          git fetch upstream master
+          git fetch origin master
+
+      - name: Check if behind upstream
+        id: check
+        run: |
+          behind=$(git rev-list --count master..upstream/master)
+          ahead=$(git rev-list --count upstream/master..master)
+          echo "fork is $behind commits behind, $ahead custom commits"
+          if [ "$behind" -eq 0 ]; then
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'skip=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Rebase onto upstream/master
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          if ! git rebase upstream/master; then
+            git rebase --abort
+            echo "::error::Rebase conflict with upstream — auto-sync aborted, fork master left untouched. Custom commits that need manual rebasing: $(git log --oneline upstream/master..master | head -20)"
+            exit 1
+          fi
+
+      - name: Push rebased master
+        if: steps.check.outputs.skip == 'false'
+        run: git push --force-with-lease origin master
